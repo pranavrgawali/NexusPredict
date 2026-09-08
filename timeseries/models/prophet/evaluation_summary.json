@@ -1,0 +1,57 @@
+{
+  "generated_at": "2026-09-06T11:47:39.470972",
+  "validation_method": "chronological_split",
+  "train_ratio": 0.8,
+  "forecast_horizon_days": 30,
+  "holiday_region": "India",
+  "categories": {
+    "Electronics": {
+      "mape": 8.92,
+      "train_days": 876,
+      "test_days": 219,
+      "status": "excellent"
+    },
+    "Clothing": {
+      "mape": 7.59,
+      "train_days": 876,
+      "test_days": 219,
+      "status": "excellent"
+    },
+    "Home_Kitchen": {
+      "mape": 8.86,
+      "train_days": 876,
+      "test_days": 219,
+      "status": "excellent"
+    },
+    "Beauty": {
+      "mape": 7.99,
+      "train_days": 876,
+      "test_days": 219,
+      "status": "excellent"
+    },
+    "Sports": {
+      "mape": 7.51,
+      "train_days": 876,
+      "test_days": 219,
+      "status": "excellent"
+    },
+    "Books": {
+      "mape": 7.91,
+      "train_days": 876,
+      "test_days": 219,
+      "status": "excellent"
+    },
+    "Grocery": {
+      "mape": 7.68,
+      "train_days": 876,
+      "test_days": 219,
+      "status": "excellent"
+    },
+    "Toys": {
+      "mape": 9.07,
+      "train_days": 876,
+      "test_days": 219,
+      "status": "excellent"
+    }
+  }
+}
