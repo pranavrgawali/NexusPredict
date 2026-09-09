@@ -121,6 +121,47 @@ def get_monthly_stats():
 
 
 # ═══════════════════════════════════════════════════════════
+# RAW CUSTOMER DATA (for ML model inference)
+# ═══════════════════════════════════════════════════════════
+
+def get_raw_customer_data(n=200):
+    """Generate raw customer records with the exact feature columns
+    expected by the trained churn and CLV models.
+
+    Returns a DataFrame ready for model_loader.predict_churn() and
+    model_loader.predict_clv() inference.
+    """
+    np.random.seed(42)
+
+    # Features matching the trained model contract
+    ages = np.random.randint(18, 65, n)
+    login_freq = np.random.randint(0, 20, n)
+    support_tickets = np.random.randint(0, 6, n)
+    is_active = np.random.choice([0, 1], n)
+    tx_count = np.random.randint(0, 50, n)
+    total_spend = np.round(np.random.lognormal(6, 1.2, n), 2)
+    avg_order = np.where(tx_count > 0,
+                         np.round(total_spend / np.maximum(tx_count, 1), 2),
+                         0.0)
+    recency = np.random.randint(1, 180, n)
+
+    return pd.DataFrame({
+        "User ID": [f"USR-{i+1001}" for i in range(n)],
+        "Customer Name": _random_names(n),
+        "Country": np.random.choice(COUNTRIES, n),
+        # Model features (exact column names from training)
+        "age": ages,
+        "login_frequency_per_month": login_freq,
+        "support_tickets_raised": support_tickets,
+        "is_active_subscriber": is_active,
+        "transaction_count": tx_count,
+        "total_spend": total_spend,
+        "average_order_value": avg_order,
+        "recency_days": recency,
+    })
+
+
+# ═══════════════════════════════════════════════════════════
 # 2. CHURN PREDICTIONS
 # ═══════════════════════════════════════════════════════════
 

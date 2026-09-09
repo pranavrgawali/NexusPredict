@@ -7,6 +7,7 @@ Run: streamlit run app.py
 import streamlit as st
 from streamlit_option_menu import option_menu
 import os
+import pandas as pd
 
 # ── Page Configuration ──
 st.set_page_config(
@@ -19,6 +20,12 @@ st.set_page_config(
 # ── Theme State Initialization ──
 if "theme" not in st.session_state:
     st.session_state.theme = "dark"
+
+# ── Uploaded Data State ──
+if "uploaded_data" not in st.session_state:
+    st.session_state.uploaded_data = None
+if "uploaded_filename" not in st.session_state:
+    st.session_state.uploaded_filename = None
 
 # ── Load Custom CSS ──
 css_path = os.path.join(os.path.dirname(__file__), "assets", "style.css")
@@ -123,6 +130,30 @@ with st.sidebar:
         },
     )
 
+    # ── Uploaded Data Indicator ──
+    if st.session_state.uploaded_data is not None:
+        df = st.session_state.uploaded_data
+        fname = st.session_state.uploaded_filename or "data"
+        st.markdown(f"""
+        <div style="margin-top: 0.8rem; padding: 0.7rem 1rem; border-radius: 12px;
+                    background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.2);">
+            <div style="display: flex; align-items: center; gap: 0.4rem; margin-bottom: 0.3rem;">
+                <span style="width: 8px; height: 8px; border-radius: 50%; background: #10b981;
+                             display: inline-block; box-shadow: 0 0 6px #10b981;"></span>
+                <span style="color: #10b981; font-size: 0.78rem; font-weight: 600;">Data Loaded</span>
+            </div>
+            <div style="color: var(--text-secondary, #94a3b8); font-size: 0.72rem;">
+                📄 {fname}<br>
+                {len(df):,} rows · {len(df.columns)} cols
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        if st.button("✕ Clear Data", key="clear_data_btn", use_container_width=True):
+            st.session_state.uploaded_data = None
+            st.session_state.uploaded_filename = None
+            st.rerun()
+
     # Sidebar footer
     st.markdown("---")
     st.markdown("""
@@ -139,14 +170,14 @@ with st.sidebar:
 
 # ── Page Router ──
 if selected == "Dashboard":
-    from pages.dashboard import render
+    from views.dashboard import render
     render()
 elif selected == "Churn Radar":
-    from pages.churn import render
+    from views.churn import render
     render()
 elif selected == "CLV Projections":
-    from pages.clv import render
+    from views.clv import render
     render()
 elif selected == "Supply Chain":
-    from pages.supply_chain import render
+    from views.supply_chain import render
     render()
