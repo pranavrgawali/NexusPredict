@@ -5,6 +5,8 @@ Model 1: Binary Classification (XGBoost / Logistic Regression)
 
 Integrates with models/churn_model.joblib when available.
 Falls back to mock data if the model is not found.
+
+Layout: Simple insights first → Technical details in expander.
 """
 
 import streamlit as st
@@ -130,20 +132,74 @@ def _get_feature_importance():
     return get_churn_feature_importance()
 
 
+def _generate_insights(summary, churn_df):
+    """Generate plain-English actionable insights from churn data."""
+    insights = []
+
+    # High-risk customers insight
+    high = summary["high_risk"]
+    total = summary["total_customers"]
+    high_pct = high / total * 100 if total > 0 else 0
+    if high > 0:
+        insights.append({
+            "icon": "🚨",
+            "text": f"<strong>{high} customers ({high_pct:.0f}%)</strong> are at high risk of leaving. "
+                    f"Consider reaching out with a special offer or personal message to bring them back."
+        })
+
+    # Medium-risk insight
+    medium = summary["medium_risk"]
+    if medium > 0:
+        insights.append({
+            "icon": "⏳",
+            "text": f"<strong>{medium} customers</strong> need attention — they're showing early signs of "
+                    f"disengagement. A loyalty reward or check-in email could make the difference."
+        })
+
+    # Top churn driver insight
+    feat_df = _get_feature_importance()
+    if len(feat_df) > 0:
+        top_feature = feat_df.iloc[0]["Feature"]
+        insights.append({
+            "icon": "🔍",
+            "text": f"The #1 reason customers leave is <strong>{top_feature}</strong>. "
+                    f"Focus on improving this area to reduce customer loss."
+        })
+
+    # Inactive customers insight
+    if "Days Since Last Purchase" in churn_df.columns:
+        inactive_30 = int((churn_df["Days Since Last Purchase"] > 30).sum())
+        if inactive_30 > 0:
+            insights.append({
+                "icon": "📅",
+                "text": f"<strong>{inactive_30} customers</strong> haven't bought anything in over 30 days. "
+                        f"A \"We miss you\" email with a discount code could re-engage them."
+            })
+
+    # Good news insight
+    low = summary["low_risk"]
+    if low > 0:
+        low_pct = low / total * 100 if total > 0 else 0
+        insights.append({
+            "icon": "🎉",
+            "text": f"Good news! <strong>{low} customers ({low_pct:.0f}%)</strong> are loyal and active. "
+                    f"Keep them happy with consistent quality and occasional surprises."
+        })
+
+    return insights
+
+
 def render():
     theme = st.session_state.get("theme", "dark")
     colors = get_theme_colors(theme)
 
     # ── Hero Banner ──
-    st.markdown(f"""
+    st.markdown("""
     <div class="hero-banner">
-        <div class="hero-title" style="display: flex; align-items: center; flex-wrap: wrap;">
-            🛡️ Retention Risk Radar
-            {_model_status_badge(LIVE_MODEL)}
-        </div>
+        <div class="hero-title">🛡️ Customer Retention</div>
         <div class="hero-subtitle">
-            Identify high-risk customers before they disengage. Filter by risk score, 
-            export target lists for win-back campaigns, and understand key churn drivers.
+            See which customers might stop buying from you, so you can bring them back
+            before it's too late.
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -152,64 +208,74 @@ def render():
     churn_df = _get_churn_data()
     summary = _get_summary(churn_df)
 
-    # ── Summary Metrics ──
+    # ═══════════════════════════════════════════════════════════
+    # SIMPLE VIEW — What a shop owner sees first
+    # ═══════════════════════════════════════════════════════════
+
+    # ── Simple Summary Cards ──
     col1, col2, col3, col4 = st.columns(4)
 
     with col1:
         st.markdown(f"""
-        <div class="metric-card rose">
-            <div class="metric-label">⚠️ High Risk Customers</div>
-            <div class="metric-value">{summary['high_risk']:,}</div>
-            <div class="metric-delta negative">
-                {summary['high_risk'] / summary['total_customers'] * 100:.1f}% of total
-            </div>
+        <div class="simple-stat-card danger">
+            <span class="simple-stat-icon">⚠️</span>
+            <div class="simple-stat-number">{summary['high_risk']:,}</div>
+            <div class="simple-stat-label">Customers At Risk</div>
+            <div class="simple-stat-sublabel">May stop buying soon</div>
         </div>
         """, unsafe_allow_html=True)
 
     with col2:
         st.markdown(f"""
-        <div class="metric-card amber">
-            <div class="metric-label">⏳ Medium Risk</div>
-            <div class="metric-value">{summary['medium_risk']:,}</div>
-            <div class="metric-delta" style="color: var(--accent-amber);">
-                {summary['medium_risk'] / summary['total_customers'] * 100:.1f}% of total
-            </div>
+        <div class="simple-stat-card warning">
+            <span class="simple-stat-icon">⏳</span>
+            <div class="simple-stat-number">{summary['medium_risk']:,}</div>
+            <div class="simple-stat-label">Need Attention</div>
+            <div class="simple-stat-sublabel">Showing early warning signs</div>
         </div>
         """, unsafe_allow_html=True)
 
     with col3:
         st.markdown(f"""
-        <div class="metric-card emerald">
-            <div class="metric-label">✅ Low Risk</div>
-            <div class="metric-value">{summary['low_risk']:,}</div>
-            <div class="metric-delta positive">
-                {summary['low_risk'] / summary['total_customers'] * 100:.1f}% of total
-            </div>
+        <div class="simple-stat-card success">
+            <span class="simple-stat-icon">💚</span>
+            <div class="simple-stat-number">{summary['low_risk']:,}</div>
+            <div class="simple-stat-label">Loyal Customers</div>
+            <div class="simple-stat-sublabel">Active and happy</div>
         </div>
         """, unsafe_allow_html=True)
 
     with col4:
         st.markdown(f"""
-        <div class="metric-card indigo">
-            <div class="metric-label">🎯 Model ROC-AUC</div>
-            <div class="metric-value">{summary['roc_auc']:.3f}</div>
-            <div class="metric-delta positive">
-                Recall: {summary['recall']:.1%}
-            </div>
+        <div class="simple-stat-card info">
+            <span class="simple-stat-icon">👥</span>
+            <div class="simple-stat-number">{summary['total_customers']:,}</div>
+            <div class="simple-stat-label">Total Customers</div>
+            <div class="simple-stat-sublabel">Analyzed for risk</div>
         </div>
         """, unsafe_allow_html=True)
 
-    st.markdown("<div style='height: 1.5rem;'></div>", unsafe_allow_html=True)
+    st.markdown("<div style='height: 1rem;'></div>", unsafe_allow_html=True)
 
-    # ── Gauge & Feature Importance Row ──
-    col_gauge, col_importance = st.columns([1, 1.5])
+    # ── Actionable Insights Box ──
+    insights = _generate_insights(summary, churn_df)
+    if insights:
+        items_html = "".join([
+            f'<div class="insight-item"><span class="insight-bullet">{ins["icon"]}</span><span>{ins["text"]}</span></div>'
+            for ins in insights
+        ])
+        st.html(f'<div class="insights-box"><div class="insights-box-title"><span class="insights-icon">💡</span>What You Should Do</div>{items_html}</div>')
+
+    st.markdown("<div style='height: 1rem;'></div>", unsafe_allow_html=True)
+
+    # ── Risk Distribution Donut (visual and intuitive) ──
+    col_gauge, col_empty = st.columns([1, 1])
 
     with col_gauge:
-        st.markdown('<div class="section-header">📊 Overall Risk Distribution</div>',
+        st.markdown('<div class="section-header">📊 Customer Risk Overview</div>',
                     unsafe_allow_html=True)
         st.markdown('<div class="chart-container">', unsafe_allow_html=True)
 
-        # Risk distribution donut
         risk_dist = pd.DataFrame({
             "Risk Level": ["High Risk", "Medium Risk", "Low Risk"],
             "Count": [summary['high_risk'], summary['medium_risk'], summary['low_risk']],
@@ -220,7 +286,6 @@ def render():
             height=340,
             theme=theme,
         )
-        # Override colors for risk-specific palette
         fig_donut.update_traces(
             marker=dict(colors=["#f43f5e", "#f59e0b", "#10b981"],
                         line=dict(color=colors["donut_border"], width=2))
@@ -228,24 +293,62 @@ def render():
         st.plotly_chart(fig_donut, use_container_width=True, config={"displayModeBar": False})
         st.markdown('</div>', unsafe_allow_html=True)
 
-    with col_importance:
-        st.markdown('<div class="section-header">🧠 Churn Feature Importance</div>',
+    with col_empty:
+        # Risk summary in plain language
+        st.markdown('<div class="section-header">📝 Risk Summary</div>',
                     unsafe_allow_html=True)
-        st.markdown('<div class="chart-container">', unsafe_allow_html=True)
-        feat_df = _get_feature_importance()
-        fig_feat = create_horizontal_importance_chart(
-            feat_df, feature_col="Feature", value_col="Importance",
-            title="Top Predictive Features",
-            height=340,
-            theme=theme,
-        )
-        st.plotly_chart(fig_feat, use_container_width=True, config={"displayModeBar": False})
-        st.markdown('</div>', unsafe_allow_html=True)
+
+        total = summary['total_customers']
+        high_pct = summary['high_risk'] / total * 100 if total > 0 else 0
+        med_pct = summary['medium_risk'] / total * 100 if total > 0 else 0
+        low_pct = summary['low_risk'] / total * 100 if total > 0 else 0
+
+        # Health indicator
+        if high_pct > 25:
+            health_color = "#f43f5e"
+            health_icon = "🔴"
+            health_text = "Needs Immediate Attention"
+        elif high_pct > 15:
+            health_color = "#f59e0b"
+            health_icon = "🟡"
+            health_text = "Room for Improvement"
+        else:
+            health_color = "#10b981"
+            health_icon = "🟢"
+            health_text = "Looking Healthy"
+
+        st.markdown(f"""
+        <div class="glass-card" style="padding: 1.5rem;">
+            <div style="text-align: center; margin-bottom: 1.5rem;">
+                <div style="font-size: 2.5rem; margin-bottom: 0.3rem;">{health_icon}</div>
+                <div style="font-family: var(--font-display); font-size: 1.2rem; font-weight: 700; color: {health_color};">
+                    {health_text}
+                </div>
+                <div style="color: var(--text-muted); font-size: 0.85rem; margin-top: 0.3rem;">
+                    Overall customer retention health
+                </div>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 0.8rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.6rem 0.8rem; background: rgba(244, 63, 94, 0.06); border-radius: 10px;">
+                    <span style="color: var(--text-secondary); font-size: 0.88rem;">⚠️ At Risk</span>
+                    <span style="font-family: var(--font-display); font-weight: 700; color: #f43f5e; font-size: 1.05rem;">{high_pct:.1f}%</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.6rem 0.8rem; background: rgba(245, 158, 11, 0.06); border-radius: 10px;">
+                    <span style="color: var(--text-secondary); font-size: 0.88rem;">⏳ Need Attention</span>
+                    <span style="font-family: var(--font-display); font-weight: 700; color: #f59e0b; font-size: 1.05rem;">{med_pct:.1f}%</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.6rem 0.8rem; background: rgba(16, 185, 129, 0.06); border-radius: 10px;">
+                    <span style="color: var(--text-secondary); font-size: 0.88rem;">💚 Loyal</span>
+                    <span style="font-family: var(--font-display); font-weight: 700; color: #10b981; font-size: 1.05rem;">{low_pct:.1f}%</span>
+                </div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
 
     st.markdown("<div style='height: 1rem;'></div>", unsafe_allow_html=True)
 
     # ── Filters ──
-    st.markdown('<div class="section-header">🔍 Customer Risk Explorer</div>',
+    st.markdown('<div class="section-header">🔍 Find Specific Customers</div>',
                 unsafe_allow_html=True)
 
     filter_col1, filter_col2, filter_col3 = st.columns([1, 1, 1])
@@ -390,3 +493,69 @@ def render():
         """, unsafe_allow_html=True)
     else:
         st.info("No customers match the current filters.")
+
+    # ═══════════════════════════════════════════════════════════
+    # TECHNICAL DETAILS — Collapsed by default
+    # ═══════════════════════════════════════════════════════════
+
+    st.markdown("<div style='height: 2rem;'></div>", unsafe_allow_html=True)
+
+    with st.expander("🔧 Technical Details — For Data Teams & Developers"):
+        st.markdown("""
+        <div class="tech-details-header">
+            <span class="tech-icon">📊</span>
+            Model Performance & Feature Analysis
+            <span class="tech-badge">ML Reference</span>
+        </div>
+        """, unsafe_allow_html=True)
+
+        st.markdown("<div style='height: 0.5rem;'></div>", unsafe_allow_html=True)
+
+        # Model status badge
+        st.markdown(f"""
+        <div style="margin-bottom: 1rem;">
+            <span style="color: var(--text-muted); font-size: 0.85rem; font-weight: 500;">Data Source:</span>
+            {_model_status_badge(LIVE_MODEL)}
+        </div>
+        """, unsafe_allow_html=True)
+
+        # Model metrics
+        tech_col1, tech_col2 = st.columns(2)
+
+        with tech_col1:
+            st.markdown(f"""
+            <div class="metric-card indigo">
+                <div class="metric-label">🎯 Model ROC-AUC</div>
+                <div class="metric-value">{summary['roc_auc']:.3f}</div>
+                <div class="metric-delta positive">
+                    Area under the ROC curve — higher is better
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+        with tech_col2:
+            st.markdown(f"""
+            <div class="metric-card cyan">
+                <div class="metric-label">🔬 Model Recall</div>
+                <div class="metric-value">{summary['recall']:.1%}</div>
+                <div class="metric-delta positive">
+                    % of actual churners correctly identified
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+        st.markdown("<div style='height: 1rem;'></div>", unsafe_allow_html=True)
+
+        # Feature Importance Chart
+        st.markdown('<div class="section-header">🧠 Churn Feature Importance</div>',
+                    unsafe_allow_html=True)
+        st.markdown('<div class="chart-container">', unsafe_allow_html=True)
+        feat_df = _get_feature_importance()
+        fig_feat = create_horizontal_importance_chart(
+            feat_df, feature_col="Feature", value_col="Importance",
+            title="Top Predictive Features",
+            height=340,
+            theme=theme,
+        )
+        st.plotly_chart(fig_feat, use_container_width=True, config={"displayModeBar": False})
+        st.markdown('</div>', unsafe_allow_html=True)

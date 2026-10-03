@@ -197,16 +197,87 @@ def _render_uploader():
             st.error(f"⚠️ Failed to parse file: {e}")
 
 
+def _generate_dashboard_insights(kpis):
+    """Generate plain-English actionable insights from dashboard KPI data."""
+    insights = []
+
+    # Revenue growth insight
+    rev_delta = kpis['revenue_delta']
+    if rev_delta > 0:
+        insights.append({
+            "icon": "📈",
+            "text": f"Your revenue is <b>up {rev_delta}%</b> compared to last month. "
+                    f"Keep up the momentum with your current strategies!"
+        })
+    else:
+        insights.append({
+            "icon": "📉",
+            "text": f"Revenue is <b>down {abs(rev_delta)}%</b> from last month. "
+                    f"Consider running a promotion or reaching out to inactive customers."
+        })
+
+    # Churn rate insight
+    churn = kpis['churn_rate']
+    churn_delta = kpis['churn_delta']
+    if churn > 15:
+        insights.append({
+            "icon": "⚠️",
+            "text": f"Your churn rate is <b>{churn}%</b> — that means roughly 1 in 7 customers "
+                    f"might stop buying. Check the Retention tab for details on who to reach out to."
+        })
+    elif churn_delta < 0:
+        insights.append({
+            "icon": "✅",
+            "text": f"Great news! Customer churn dropped by <b>{abs(churn_delta)}%</b>. "
+                    f"Your retention efforts are paying off."
+        })
+
+    # Order growth
+    orders_delta = kpis['orders_delta']
+    if orders_delta > 10:
+        insights.append({
+            "icon": "🛒",
+            "text": f"Orders are <b>up {orders_delta}%</b> this month — "
+                    f"make sure your inventory can handle the increased demand."
+        })
+
+    # Conversion rate
+    conv = kpis['conversion_rate']
+    conv_delta = kpis['conversion_delta']
+    if conv < 3:
+        insights.append({
+            "icon": "🎯",
+            "text": f"Your conversion rate is <b>{conv}%</b>. "
+                    f"Improving your product pages or adding reviews could help turn more visitors into buyers."
+        })
+    elif conv_delta > 0:
+        insights.append({
+            "icon": "🎯",
+            "text": f"Conversion rate improved by <b>{conv_delta}%</b> to <b>{conv}%</b>. "
+                    f"Whatever you changed is working — keep it up!"
+        })
+
+    # AOV insight
+    aov = kpis['avg_order_value']
+    insights.append({
+        "icon": "💡",
+        "text": f"Average order value is <b>₹{aov:,.0f}</b>. "
+                f"Offering bundle deals or 'frequently bought together' suggestions can increase this."
+    })
+
+    return insights
+
+
 def render():
     theme = st.session_state.get("theme", "dark")
 
     # ── Hero Banner ──
     st.markdown("""
     <div class="hero-banner">
-        <div class="hero-title">Executive Dashboard</div>
+        <div class="hero-title">📊 Your Shop Overview</div>
         <div class="hero-subtitle">
-            Real-time overview of your e-commerce performance — revenue, user engagement, 
-            and operational metrics at a glance.
+            See how your business is doing at a glance — revenue, orders, customers,
+            and what needs your attention today.
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -217,29 +288,68 @@ def render():
 
     st.markdown("<div style='height: 1.5rem;'></div>", unsafe_allow_html=True)
 
-    # ── KPI Cards ──
+    # ── KPI Cards (simplified labels) ──
     kpis = get_dashboard_kpis()
 
-    col1, col2, col3, col4, col5, col6 = st.columns(6)
+    col1, col2, col3, col4 = st.columns(4)
 
     with col1:
-        _metric_card("Total Revenue", f"₹{kpis['total_revenue']:,.0f}",
-                      kpis['revenue_delta'], "💰", "indigo")
+        delta_class = "positive" if kpis['revenue_delta'] >= 0 else "negative"
+        delta_icon = "↑" if kpis['revenue_delta'] >= 0 else "↓"
+        st.markdown(f"""
+        <div class="simple-stat-card info">
+            <span class="simple-stat-icon">💰</span>
+            <div class="simple-stat-number">₹{kpis['total_revenue']:,.0f}</div>
+            <div class="simple-stat-label">Total Revenue</div>
+            <div class="simple-stat-sublabel {delta_class}">{delta_icon} {abs(kpis['revenue_delta'])}% vs last month</div>
+        </div>
+        """, unsafe_allow_html=True)
+
     with col2:
-        _metric_card("Active Users", f"{kpis['active_users']:,}",
-                      kpis['users_delta'], "👥", "cyan")
+        delta_class = "positive" if kpis['users_delta'] >= 0 else "negative"
+        delta_icon = "↑" if kpis['users_delta'] >= 0 else "↓"
+        st.markdown(f"""
+        <div class="simple-stat-card success">
+            <span class="simple-stat-icon">👥</span>
+            <div class="simple-stat-number">{kpis['active_users']:,}</div>
+            <div class="simple-stat-label">Active Customers</div>
+            <div class="simple-stat-sublabel {delta_class}">{delta_icon} {abs(kpis['users_delta'])}% vs last month</div>
+        </div>
+        """, unsafe_allow_html=True)
+
     with col3:
-        _metric_card("Avg Order Value", f"₹{kpis['avg_order_value']:,.2f}",
-                      kpis['aov_delta'], "🛒", "emerald")
+        delta_class = "positive" if kpis['orders_delta'] >= 0 else "negative"
+        delta_icon = "↑" if kpis['orders_delta'] >= 0 else "↓"
+        st.markdown(f"""
+        <div class="simple-stat-card warning">
+            <span class="simple-stat-icon">📦</span>
+            <div class="simple-stat-number">{kpis['monthly_orders']:,}</div>
+            <div class="simple-stat-label">Orders This Month</div>
+            <div class="simple-stat-sublabel {delta_class}">{delta_icon} {abs(kpis['orders_delta'])}% vs last month</div>
+        </div>
+        """, unsafe_allow_html=True)
+
     with col4:
-        _metric_card("Monthly Orders", f"{kpis['monthly_orders']:,}",
-                      kpis['orders_delta'], "📦", "violet")
-    with col5:
-        _metric_card("Churn Rate", f"{kpis['churn_rate']}%",
-                      kpis['churn_delta'], "⚠️", "rose")
-    with col6:
-        _metric_card("Conversion", f"{kpis['conversion_rate']}%",
-                      kpis['conversion_delta'], "🎯", "amber")
+        churn_class = "negative" if kpis['churn_rate'] > 15 else "positive"
+        st.markdown(f"""
+        <div class="simple-stat-card danger">
+            <span class="simple-stat-icon">⚠️</span>
+            <div class="simple-stat-number">{kpis['churn_rate']}%</div>
+            <div class="simple-stat-label">Customer Churn</div>
+            <div class="simple-stat-sublabel">Customers who may leave</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    st.markdown("<div style='height: 1rem;'></div>", unsafe_allow_html=True)
+
+    # ── Actionable Insights Box ──
+    insights = _generate_dashboard_insights(kpis)
+    if insights:
+        items_html = "".join([
+            f'<div class="insight-item"><span class="insight-bullet">{ins["icon"]}</span><span>{ins["text"]}</span></div>'
+            for ins in insights
+        ])
+        st.html(f'<div class="insights-box"><div class="insights-box-title"><span class="insights-icon">💡</span>What You Should Know</div>{items_html}</div>')
 
     st.markdown("<div style='height: 1.5rem;'></div>", unsafe_allow_html=True)
 
@@ -276,48 +386,7 @@ def render():
 
     st.markdown("<div style='height: 1rem;'></div>", unsafe_allow_html=True)
 
-    # ── User Acquisition & Transactions ──
-    col_acq, col_txn = st.columns([1, 1.5])
-
-    with col_acq:
-        st.markdown('<div class="section-header">🚀 User Acquisition Channels</div>',
-                    unsafe_allow_html=True)
-        st.markdown('<div class="chart-container">', unsafe_allow_html=True)
-        acq_df = get_user_acquisition()
-        fig3 = create_bar_chart(
-            acq_df, x="Channel", y="Users",
-            title="Users by Acquisition Channel",
-            orientation="h", text_auto=True,
-            height=340,
-            theme=theme,
-        )
-        st.plotly_chart(fig3, use_container_width=True, config={"displayModeBar": False})
-        st.markdown('</div>', unsafe_allow_html=True)
-
-    with col_txn:
-        st.markdown('<div class="section-header">🧾 Recent Transactions</div>',
-                    unsafe_allow_html=True)
-        st.markdown('<div class="chart-container">', unsafe_allow_html=True)
-        txn_df = get_recent_transactions(12)
-        st.dataframe(
-            txn_df,
-            use_container_width=True,
-            hide_index=True,
-            height=340,
-            column_config={
-                "Amount (₹)": st.column_config.NumberColumn(
-                    format="₹%.2f",
-                ),
-                "Transaction ID": st.column_config.TextColumn(
-                    width="small",
-                ),
-            }
-        )
-        st.markdown('</div>', unsafe_allow_html=True)
-
-    # ── Bottom Stats ──
-    st.markdown("<div style='height: 1rem;'></div>", unsafe_allow_html=True)
-
+    # ── Quick Stats (simplified) ──
     stats = get_monthly_stats()
     col_s1, col_s2, col_s3 = st.columns(3)
 
@@ -334,19 +403,109 @@ def render():
     with col_s2:
         st.markdown("""
         <div class="glass-card" style="text-align: center;">
-            <div class="metric-label">👤 Avg Monthly New Users</div>
+            <div class="metric-label">🛒 Avg Order Value</div>
             <div class="metric-value" style="font-size: 1.5rem;">
-                {:,}
+                ₹{:,.0f}
             </div>
         </div>
-        """.format(int(stats["Users"].mean())), unsafe_allow_html=True)
+        """.format(kpis['avg_order_value']), unsafe_allow_html=True)
 
     with col_s3:
         st.markdown("""
         <div class="glass-card" style="text-align: center;">
-            <div class="metric-label">📦 Avg Monthly Orders</div>
+            <div class="metric-label">🎯 Conversion Rate</div>
             <div class="metric-value" style="font-size: 1.5rem;">
-                {:,}
+                {}%
             </div>
         </div>
-        """.format(int(stats["Orders"].mean())), unsafe_allow_html=True)
+        """.format(kpis['conversion_rate']), unsafe_allow_html=True)
+
+    # ═══════════════════════════════════════════════════════════
+    # TECHNICAL DETAILS — Collapsed by default
+    # ═══════════════════════════════════════════════════════════
+
+    st.markdown("<div style='height: 2rem;'></div>", unsafe_allow_html=True)
+
+    with st.expander("🔧 Technical Details — For Data Teams & Developers"):
+        st.markdown("""
+        <div class="tech-details-header">
+            <span class="tech-icon">📊</span>
+            Detailed Metrics & Acquisition Data
+            <span class="tech-badge">Analytics</span>
+        </div>
+        """, unsafe_allow_html=True)
+
+        st.markdown("<div style='height: 0.5rem;'></div>", unsafe_allow_html=True)
+
+        # Detailed KPI cards
+        tc1, tc2, tc3, tc4 = st.columns(4)
+        with tc1:
+            _metric_card("Avg Order Value", f"₹{kpis['avg_order_value']:,.2f}",
+                          kpis['aov_delta'], "🛒", "emerald")
+        with tc2:
+            _metric_card("Monthly Orders", f"{kpis['monthly_orders']:,}",
+                          kpis['orders_delta'], "📦", "violet")
+        with tc3:
+            _metric_card("Churn Rate", f"{kpis['churn_rate']}%",
+                          kpis['churn_delta'], "⚠️", "rose")
+        with tc4:
+            _metric_card("Conversion", f"{kpis['conversion_rate']}%",
+                          kpis['conversion_delta'], "🎯", "amber")
+
+        st.markdown("<div style='height: 1rem;'></div>", unsafe_allow_html=True)
+
+        # User Acquisition & Transactions
+        col_acq, col_txn = st.columns([1, 1.5])
+
+        with col_acq:
+            st.markdown('<div class="section-header">🚀 User Acquisition Channels</div>',
+                        unsafe_allow_html=True)
+            st.markdown('<div class="chart-container">', unsafe_allow_html=True)
+            acq_df = get_user_acquisition()
+            fig3 = create_bar_chart(
+                acq_df, x="Channel", y="Users",
+                title="Users by Acquisition Channel",
+                orientation="h", text_auto=True,
+                height=340,
+                theme=theme,
+            )
+            st.plotly_chart(fig3, use_container_width=True, config={"displayModeBar": False})
+            st.markdown('</div>', unsafe_allow_html=True)
+
+        with col_txn:
+            st.markdown('<div class="section-header">🧾 Recent Transactions</div>',
+                        unsafe_allow_html=True)
+            st.markdown('<div class="chart-container">', unsafe_allow_html=True)
+            txn_df = get_recent_transactions(12)
+            st.dataframe(
+                txn_df,
+                use_container_width=True,
+                hide_index=True,
+                height=340,
+                column_config={
+                    "Amount (₹)": st.column_config.NumberColumn(
+                        format="₹%.2f",
+                    ),
+                    "Transaction ID": st.column_config.TextColumn(
+                        width="small",
+                    ),
+                }
+            )
+            st.markdown('</div>', unsafe_allow_html=True)
+
+        # Monthly stats
+        st.markdown("<div style='height: 1rem;'></div>", unsafe_allow_html=True)
+        st.markdown('<div class="section-header">📈 Monthly Trend Data</div>',
+                    unsafe_allow_html=True)
+        st.markdown('<div class="chart-container">', unsafe_allow_html=True)
+        st.dataframe(
+            stats,
+            use_container_width=True,
+            hide_index=True,
+            height=240,
+            column_config={
+                "Revenue": st.column_config.NumberColumn(format="₹%.0f"),
+            },
+        )
+        st.markdown('</div>', unsafe_allow_html=True)
+

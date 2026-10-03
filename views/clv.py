@@ -5,6 +5,8 @@ Model 2: Regression (Random Forest / Gradient Boosting)
 
 Integrates with models/clv_model.joblib when available.
 Falls back to mock data if the model is not found.
+
+Layout: Simple insights first → Technical details in expander.
 """
 
 import streamlit as st
@@ -154,20 +156,75 @@ def _get_tier_summary(clv_df):
     return get_clv_tier_summary()
 
 
+def _generate_insights(clv_df, tier_summary):
+    """Generate plain-English actionable insights from CLV data."""
+    insights = []
+
+    total = len(clv_df)
+
+    # VIP customers insight
+    if "Tier" in clv_df.columns:
+        platinum = clv_df[clv_df["Tier"] == "Platinum"]
+        if len(platinum) > 0:
+            top_value = platinum["Predicted CLV (₹)"].sum()
+            insights.append({
+                "icon": "💎",
+                "text": f"Your <strong>{len(platinum)} VIP customers</strong> are worth a combined "
+                        f"<strong>₹{top_value:,.0f}</strong> over the next 6 months. "
+                        f"Give them priority support and exclusive offers to keep them happy!"
+            })
+
+    # Top 10 insight
+    if len(clv_df) >= 10:
+        top10_value = clv_df.head(10)["Predicted CLV (₹)"].sum()
+        insights.append({
+            "icon": "🌟",
+            "text": f"Your <strong>top 10 customers alone</strong> are projected to bring in "
+                    f"<strong>₹{top10_value:,.0f}</strong>. These are your most important relationships."
+        })
+
+    # Average CLV insight
+    avg_clv = clv_df["Predicted CLV (₹)"].mean()
+    insights.append({
+        "icon": "📊",
+        "text": f"On average, each customer is worth <strong>₹{avg_clv:,.0f}</strong> over 6 months. "
+                f"Increasing purchase frequency or order size can boost this number."
+    })
+
+    # Bronze upgrade opportunity
+    if "Tier" in clv_df.columns:
+        bronze = clv_df[clv_df["Tier"] == "Bronze"]
+        silver = clv_df[clv_df["Tier"] == "Silver"]
+        if len(bronze) > 0:
+            insights.append({
+                "icon": "📈",
+                "text": f"<strong>{len(bronze)} Bronze-tier customers</strong> could be upgraded. "
+                        f"Targeted promotions and engagement campaigns can move them to Silver tier, "
+                        f"significantly increasing their lifetime value."
+            })
+
+    # Total projected revenue
+    total_projected = clv_df["Predicted CLV (₹)"].sum()
+    insights.append({
+        "icon": "💰",
+        "text": f"Total projected revenue from all {total} customers: "
+                f"<strong>₹{total_projected:,.0f}</strong> over the next 6 months."
+    })
+
+    return insights
+
+
 def render():
     theme = st.session_state.get("theme", "dark")
     colors = get_theme_colors(theme)
 
     # ── Hero Banner ──
-    st.markdown(f"""
+    st.markdown("""
     <div class="hero-banner">
-        <div class="hero-title" style="display: flex; align-items: center; flex-wrap: wrap;">
-            💰 Financial Projections
-            {_model_status_badge(LIVE_MODEL)}
-        </div>
+        <div class="hero-title">💰 Customer Value</div>
         <div class="hero-subtitle">
-            Estimate 6-month customer lifetime value using RFM analysis. Target predicted
-            VIP spenders with high-tier support options and optimize acquisition spend.
+            Know how much each customer is worth to your business over the next 6 months,
+            so you can invest your time and money where it matters most.
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -177,64 +234,77 @@ def render():
     metrics = _get_metrics()
     tier_summary = _get_tier_summary(clv_df)
 
-    # ── Model Metrics ──
+    # ═══════════════════════════════════════════════════════════
+    # SIMPLE VIEW — What a shop owner sees first
+    # ═══════════════════════════════════════════════════════════
+
+    # ── Simple Summary Cards ──
+    # Calculate key numbers
+    total_customers = len(clv_df)
+    avg_clv = clv_df["Predicted CLV (₹)"].mean()
+    top_clv = clv_df["Predicted CLV (₹)"].max()
+    platinum_count = len(clv_df[clv_df["Tier"] == "Platinum"]) if "Tier" in clv_df.columns else 0
+
     col1, col2, col3, col4 = st.columns(4)
 
     with col1:
         st.markdown(f"""
-        <div class="metric-card indigo">
-            <div class="metric-label">📐 Mean Absolute Error</div>
-            <div class="metric-value">₹{metrics['mae']:,.2f}</div>
-            <div class="metric-delta" style="color: var(--text-muted);">Avg prediction deviation</div>
+        <div class="simple-stat-card purple">
+            <span class="simple-stat-icon">💎</span>
+            <div class="simple-stat-number">{platinum_count:,}</div>
+            <div class="simple-stat-label">VIP Customers</div>
+            <div class="simple-stat-sublabel">Your highest-value buyers</div>
         </div>
         """, unsafe_allow_html=True)
 
     with col2:
         st.markdown(f"""
-        <div class="metric-card cyan">
-            <div class="metric-label">📏 Root Mean Sq Error</div>
-            <div class="metric-value">₹{metrics['rmse']:,.2f}</div>
-            <div class="metric-delta" style="color: var(--text-muted);">Penalizes large errors</div>
+        <div class="simple-stat-card success">
+            <span class="simple-stat-icon">🏆</span>
+            <div class="simple-stat-number">₹{top_clv:,.0f}</div>
+            <div class="simple-stat-label">Most Valuable Customer</div>
+            <div class="simple-stat-sublabel">Highest projected worth</div>
         </div>
         """, unsafe_allow_html=True)
 
     with col3:
-        if metrics.get("r2_score", 0) > 0:
-            r2_display = f"{metrics['r2_score']:.3f}"
-            r2_delta = "Variance explained"
-        else:
-            r2_display = "—"
-            r2_delta = "Not stored in artifact"
         st.markdown(f"""
-        <div class="metric-card emerald">
-            <div class="metric-label">🎯 R² Score</div>
-            <div class="metric-value">{r2_display}</div>
-            <div class="metric-delta positive">{r2_delta}</div>
+        <div class="simple-stat-card info">
+            <span class="simple-stat-icon">📊</span>
+            <div class="simple-stat-number">₹{avg_clv:,.0f}</div>
+            <div class="simple-stat-label">Average Customer Value</div>
+            <div class="simple-stat-sublabel">Per customer, next 6 months</div>
         </div>
         """, unsafe_allow_html=True)
 
     with col4:
-        if metrics.get("mape", 0) > 0:
-            mape_display = f"{metrics['mape']:.1f}%"
-            mape_delta = "Mean % error"
-        else:
-            mape_display = "—"
-            mape_delta = "Not stored in artifact"
         st.markdown(f"""
-        <div class="metric-card amber">
-            <div class="metric-label">📊 MAPE</div>
-            <div class="metric-value">{mape_display}</div>
-            <div class="metric-delta" style="color: var(--text-muted);">{mape_delta}</div>
+        <div class="simple-stat-card warning">
+            <span class="simple-stat-icon">👥</span>
+            <div class="simple-stat-number">{total_customers:,}</div>
+            <div class="simple-stat-label">Customers Analyzed</div>
+            <div class="simple-stat-sublabel">With value predictions</div>
         </div>
         """, unsafe_allow_html=True)
 
-    st.markdown("<div style='height: 1.5rem;'></div>", unsafe_allow_html=True)
+    st.markdown("<div style='height: 1rem;'></div>", unsafe_allow_html=True)
+
+    # ── Actionable Insights Box ──
+    insights = _generate_insights(clv_df, tier_summary)
+    if insights:
+        items_html = "".join([
+            f'<div class="insight-item"><span class="insight-bullet">{ins["icon"]}</span><span>{ins["text"]}</span></div>'
+            for ins in insights
+        ])
+        st.html(f'<div class="insights-box"><div class="insights-box-title"><span class="insights-icon">💡</span>What You Should Know</div>{items_html}</div>')
+
+    st.markdown("<div style='height: 1rem;'></div>", unsafe_allow_html=True)
 
     # ── Tier Summary & CLV Distribution ──
     col_tiers, col_dist = st.columns([1, 1.5])
 
     with col_tiers:
-        st.markdown('<div class="section-header">🏆 CLV Tier Breakdown</div>',
+        st.markdown('<div class="section-header">🏆 Customer Tiers</div>',
                     unsafe_allow_html=True)
 
         for _, row in tier_summary.iterrows():
@@ -257,14 +327,14 @@ def render():
                         <div style="font-family: var(--font-display); font-weight: 700; color: var(--text-primary); font-size: 1.1rem;">
                             ₹{row['Avg CLV (₹)']:,.0f}
                         </div>
-                        <div style="color: var(--text-muted); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em;">avg clv</div>
+                        <div style="color: var(--text-muted); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em;">avg value</div>
                     </div>
                 </div>
             </div>
             """, unsafe_allow_html=True)
 
     with col_dist:
-        st.markdown('<div class="section-header">📊 CLV Distribution</div>',
+        st.markdown('<div class="section-header">📊 Value Distribution</div>',
                     unsafe_allow_html=True)
         st.markdown('<div class="chart-container">', unsafe_allow_html=True)
 
@@ -279,7 +349,7 @@ def render():
             plot_bgcolor="rgba(0,0,0,0)",
             font=dict(family="Inter, sans-serif", color=colors["text"], size=12),
             margin=dict(l=20, r=20, t=40, b=20),
-            title=dict(text="Predicted CLV Distribution by Tier", font=dict(size=15, color=colors["text"])),
+            title=dict(text="How Customer Values Are Spread", font=dict(size=15, color=colors["text"])),
             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1,
                        font=dict(color=colors["text_secondary"], size=11)),
             bargap=0.05,
@@ -298,47 +368,11 @@ def render():
 
     st.markdown("<div style='height: 1rem;'></div>", unsafe_allow_html=True)
 
-    # ── Feature Importance (only if live model) ──
-    if LIVE_MODEL:
-        fi_df = get_clv_feature_importance_from_model()
-        if fi_df is not None:
-            st.markdown('<div class="section-header">🧠 CLV Feature Importance</div>',
-                        unsafe_allow_html=True)
-            st.markdown('<div class="chart-container">', unsafe_allow_html=True)
-            fig_fi = create_horizontal_importance_chart(
-                fi_df, feature_col="Feature", value_col="Importance",
-                title="Top Predictive Features (from trained model)",
-                height=340,
-                theme=theme,
-            )
-            st.plotly_chart(fig_fi, use_container_width=True, config={"displayModeBar": False})
-            st.markdown('</div>', unsafe_allow_html=True)
-            st.markdown("<div style='height: 1rem;'></div>", unsafe_allow_html=True)
-
-    # ── RFM Scatter Plot ──
-    st.markdown('<div class="section-header">🔬 RFM Analysis — Recency vs Monetary</div>',
-                unsafe_allow_html=True)
-
-    st.markdown('<div class="chart-container">', unsafe_allow_html=True)
-    fig_scatter = create_scatter_chart(
-        clv_df,
-        x="Recency (Days)", y="Avg Monetary (₹)",
-        color_col="Tier", size_col="Frequency",
-        title="Customer Segments: Recency × Monetary (sized by Frequency)",
-        height=440,
-        color_map=TIER_COLORS,
-        theme=theme,
-    )
-    st.plotly_chart(fig_scatter, use_container_width=True, config={"displayModeBar": False})
-    st.markdown('</div>', unsafe_allow_html=True)
-
-    st.markdown("<div style='height: 1rem;'></div>", unsafe_allow_html=True)
-
     # ── Top Customers & Individual Lookup ──
     col_top, col_lookup = st.columns([1, 1])
 
     with col_top:
-        st.markdown('<div class="section-header">🌟 Top 10 Highest-Value Customers</div>',
+        st.markdown('<div class="section-header">🌟 Your Top 10 Most Valuable Customers</div>',
                     unsafe_allow_html=True)
         st.markdown('<div class="chart-container">', unsafe_allow_html=True)
         top10 = clv_df.head(10)
@@ -358,7 +392,7 @@ def render():
         st.markdown('</div>', unsafe_allow_html=True)
 
     with col_lookup:
-        st.markdown('<div class="section-header">🔎 Individual Customer Lookup</div>',
+        st.markdown('<div class="section-header">🔎 Look Up a Customer</div>',
                     unsafe_allow_html=True)
 
         selected_user = st.selectbox(
@@ -394,26 +428,26 @@ def render():
                 </div>
             </div>
             <div style="margin-top: 1.5rem; text-align: center;">
-                <div style="color: var(--text-muted); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.1em;">Predicted 6-Month CLV</div>
+                <div style="color: var(--text-muted); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.1em;">Projected 6-Month Value</div>
                 <div style="font-family: var(--font-display); font-size: 2.5rem; font-weight: 800; color: {tier_color}; margin: 0.3rem 0;">
                     ₹{user['Predicted CLV (₹)']:,.2f}
                 </div>
             </div>
             <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-top: 1.5rem; text-align: center;">
                 <div style="background: rgba(99, 102, 241, 0.06); border-radius: var(--radius-md); padding: 1rem;">
-                    <div style="color: var(--text-muted); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em;">Recency</div>
+                    <div style="color: var(--text-muted); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em;">Last Visit</div>
                     <div style="color: var(--text-primary); font-size: 1.3rem; font-weight: 700; font-family: var(--font-display);">
-                        {user_recency}d
+                        {user_recency}d ago
                     </div>
                 </div>
                 <div style="background: rgba(34, 211, 238, 0.06); border-radius: var(--radius-md); padding: 1rem;">
-                    <div style="color: var(--text-muted); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em;">Frequency</div>
+                    <div style="color: var(--text-muted); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em;">Purchases</div>
                     <div style="color: var(--text-primary); font-size: 1.3rem; font-weight: 700; font-family: var(--font-display);">
                         {user_frequency}x
                     </div>
                 </div>
                 <div style="background: rgba(16, 185, 129, 0.06); border-radius: var(--radius-md); padding: 1rem;">
-                    <div style="color: var(--text-muted); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em;">Monetary</div>
+                    <div style="color: var(--text-muted); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em;">Avg Spend</div>
                     <div style="color: var(--text-primary); font-size: 1.3rem; font-weight: 700; font-family: var(--font-display);">
                         ₹{user_monetary:,.0f}
                     </div>
@@ -422,39 +456,151 @@ def render():
         </div>
         """, unsafe_allow_html=True)
 
-    st.markdown("<div style='height: 1rem;'></div>", unsafe_allow_html=True)
+    # ═══════════════════════════════════════════════════════════
+    # TECHNICAL DETAILS — Collapsed by default
+    # ═══════════════════════════════════════════════════════════
 
-    # ── CLV by Tier Bar Chart ──
-    st.markdown('<div class="section-header">📊 Total Revenue Contribution by Tier</div>',
-                unsafe_allow_html=True)
-    st.markdown('<div class="chart-container">', unsafe_allow_html=True)
+    st.markdown("<div style='height: 2rem;'></div>", unsafe_allow_html=True)
 
-    fig_bar = go.Figure(go.Bar(
-        x=tier_summary["Tier"],
-        y=tier_summary["Total Revenue (₹)"],
-        marker=dict(
-            color=[TIER_COLORS[t] for t in tier_summary["Tier"]],
-            cornerradius=8,
-        ),
-        text=tier_summary["Total Revenue (₹)"].apply(lambda v: f"₹{v:,.0f}"),
-        textposition="outside",
-        textfont=dict(color=colors["text_secondary"], size=11),
-        hovertemplate="<b>%{x}</b><br>Total Revenue: ₹%{y:,.0f}<extra></extra>",
-    ))
-    fig_bar.update_layout(
-        paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(0,0,0,0)",
-        font=dict(family="Inter, sans-serif", color=colors["text"], size=12),
-        margin=dict(l=20, r=20, t=40, b=20),
-        height=350,
-        title=dict(text="Revenue Contribution per CLV Tier", font=dict(size=15, color=colors["text"])),
-    )
-    fig_bar.update_xaxes(
-        showgrid=False, tickfont=dict(color=colors["text_muted"], size=12),
-    )
-    fig_bar.update_yaxes(
-        showgrid=True, gridcolor=colors["grid"],
-        tickfont=dict(color=colors["text_muted"], size=11), zeroline=False,
-    )
-    st.plotly_chart(fig_bar, use_container_width=True, config={"displayModeBar": False})
-    st.markdown('</div>', unsafe_allow_html=True)
+    with st.expander("🔧 Technical Details — For Data Teams & Developers"):
+        st.markdown("""
+        <div class="tech-details-header">
+            <span class="tech-icon">📊</span>
+            Model Performance & Analysis
+            <span class="tech-badge">ML Reference</span>
+        </div>
+        """, unsafe_allow_html=True)
+
+        st.markdown("<div style='height: 0.5rem;'></div>", unsafe_allow_html=True)
+
+        # Model status badge
+        st.markdown(f"""
+        <div style="margin-bottom: 1rem;">
+            <span style="color: var(--text-muted); font-size: 0.85rem; font-weight: 500;">Data Source:</span>
+            {_model_status_badge(LIVE_MODEL)}
+        </div>
+        """, unsafe_allow_html=True)
+
+        # ── Model Metrics ──
+        col1, col2, col3, col4 = st.columns(4)
+
+        with col1:
+            st.markdown(f"""
+            <div class="metric-card indigo">
+                <div class="metric-label">📐 Mean Absolute Error</div>
+                <div class="metric-value">₹{metrics['mae']:,.2f}</div>
+                <div class="metric-delta" style="color: var(--text-muted);">Avg prediction deviation</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+        with col2:
+            st.markdown(f"""
+            <div class="metric-card cyan">
+                <div class="metric-label">📏 Root Mean Sq Error</div>
+                <div class="metric-value">₹{metrics['rmse']:,.2f}</div>
+                <div class="metric-delta" style="color: var(--text-muted);">Penalizes large errors</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+        with col3:
+            if metrics.get("r2_score", 0) > 0:
+                r2_display = f"{metrics['r2_score']:.3f}"
+                r2_delta = "Variance explained"
+            else:
+                r2_display = "—"
+                r2_delta = "Not stored in artifact"
+            st.markdown(f"""
+            <div class="metric-card emerald">
+                <div class="metric-label">🎯 R² Score</div>
+                <div class="metric-value">{r2_display}</div>
+                <div class="metric-delta positive">{r2_delta}</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+        with col4:
+            if metrics.get("mape", 0) > 0:
+                mape_display = f"{metrics['mape']:.1f}%"
+                mape_delta = "Mean % error"
+            else:
+                mape_display = "—"
+                mape_delta = "Not stored in artifact"
+            st.markdown(f"""
+            <div class="metric-card amber">
+                <div class="metric-label">📊 MAPE</div>
+                <div class="metric-value">{mape_display}</div>
+                <div class="metric-delta" style="color: var(--text-muted);">{mape_delta}</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+        st.markdown("<div style='height: 1rem;'></div>", unsafe_allow_html=True)
+
+        # ── Feature Importance (only if live model) ──
+        if LIVE_MODEL:
+            fi_df = get_clv_feature_importance_from_model()
+            if fi_df is not None:
+                st.markdown('<div class="section-header">🧠 CLV Feature Importance</div>',
+                            unsafe_allow_html=True)
+                st.markdown('<div class="chart-container">', unsafe_allow_html=True)
+                fig_fi = create_horizontal_importance_chart(
+                    fi_df, feature_col="Feature", value_col="Importance",
+                    title="Top Predictive Features (from trained model)",
+                    height=340,
+                    theme=theme,
+                )
+                st.plotly_chart(fig_fi, use_container_width=True, config={"displayModeBar": False})
+                st.markdown('</div>', unsafe_allow_html=True)
+                st.markdown("<div style='height: 1rem;'></div>", unsafe_allow_html=True)
+
+        # ── RFM Scatter Plot ──
+        st.markdown('<div class="section-header">🔬 RFM Analysis — Recency vs Monetary</div>',
+                    unsafe_allow_html=True)
+
+        st.markdown('<div class="chart-container">', unsafe_allow_html=True)
+        fig_scatter = create_scatter_chart(
+            clv_df,
+            x="Recency (Days)", y="Avg Monetary (₹)",
+            color_col="Tier", size_col="Frequency",
+            title="Customer Segments: Recency × Monetary (sized by Frequency)",
+            height=440,
+            color_map=TIER_COLORS,
+            theme=theme,
+        )
+        st.plotly_chart(fig_scatter, use_container_width=True, config={"displayModeBar": False})
+        st.markdown('</div>', unsafe_allow_html=True)
+
+        st.markdown("<div style='height: 1rem;'></div>", unsafe_allow_html=True)
+
+        # ── CLV by Tier Bar Chart ──
+        st.markdown('<div class="section-header">📊 Total Revenue Contribution by Tier</div>',
+                    unsafe_allow_html=True)
+        st.markdown('<div class="chart-container">', unsafe_allow_html=True)
+
+        fig_bar = go.Figure(go.Bar(
+            x=tier_summary["Tier"],
+            y=tier_summary["Total Revenue (₹)"],
+            marker=dict(
+                color=[TIER_COLORS[t] for t in tier_summary["Tier"]],
+                cornerradius=8,
+            ),
+            text=tier_summary["Total Revenue (₹)"].apply(lambda v: f"₹{v:,.0f}"),
+            textposition="outside",
+            textfont=dict(color=colors["text_secondary"], size=11),
+            hovertemplate="<b>%{x}</b><br>Total Revenue: ₹%{y:,.0f}<extra></extra>",
+        ))
+        fig_bar.update_layout(
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            font=dict(family="Inter, sans-serif", color=colors["text"], size=12),
+            margin=dict(l=20, r=20, t=40, b=20),
+            height=350,
+            title=dict(text="Revenue Contribution per CLV Tier", font=dict(size=15, color=colors["text"])),
+        )
+        fig_bar.update_xaxes(
+            showgrid=False, tickfont=dict(color=colors["text_muted"], size=12),
+        )
+        fig_bar.update_yaxes(
+            showgrid=True, gridcolor=colors["grid"],
+            tickfont=dict(color=colors["text_muted"], size=11), zeroline=False,
+        )
+        st.plotly_chart(fig_bar, use_container_width=True, config={"displayModeBar": False})
+        st.markdown('</div>', unsafe_allow_html=True)

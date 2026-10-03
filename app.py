@@ -64,48 +64,44 @@ st.markdown(f"""
 
 # ── Sidebar ──
 with st.sidebar:
-    # Logo
+    # ── Brand Header Card ──
     st.markdown("""
-    <div class="sidebar-logo">
-        <div class="logo-text">🔮 NexusPredict</div>
-        <div class="logo-sub">Smart Analytics Dashboard</div>
+    <div class="sidebar-brand-card">
+        <div class="brand-badge-icon">🔮</div>
+        <div class="brand-text-block">
+            <div class="brand-title">NexusPredict</div>
+            <div class="brand-subtitle">Shop Intelligence Cockpit</div>
+        </div>
     </div>
     """, unsafe_allow_html=True)
 
-    # ── Theme Toggle ──
-    st.markdown("""
-    <div class="theme-toggle-container">
-        <span class="theme-toggle-label moon">🌙</span>
-    """, unsafe_allow_html=True)
-
-    # Use a real Streamlit toggle for reactivity
-    is_light = st.toggle(
+    # ── Theme Selector ──
+    st.markdown('<div class="sidebar-section-title"><span>APPEARANCE</span></div>', unsafe_allow_html=True)
+    theme_choice = st.segmented_control(
         "Theme",
-        value=(st.session_state.theme == "light"),
-        key="theme_toggle",
+        options=["🌙 Dark", "☀️ Light"],
+        default="🌙 Dark" if st.session_state.theme == "dark" else "☀️ Light",
+        key="sidebar_theme_toggle",
         label_visibility="collapsed",
+        width="stretch",
     )
 
-    # Update theme state
-    new_theme = "light" if is_light else "dark"
-    if new_theme != st.session_state.theme:
-        st.session_state.theme = new_theme
-        st.rerun()
+    if theme_choice:
+        selected_theme = "light" if "Light" in theme_choice else "dark"
+        if selected_theme != st.session_state.theme:
+            st.session_state.theme = selected_theme
+            st.rerun()
 
-    st.markdown("""
-        <span class="theme-toggle-label sun">☀️</span>
-    </div>
-    """, unsafe_allow_html=True)
-
-    # Navigation
+    # ── Navigation Menu ──
+    st.markdown('<div class="sidebar-section-title" style="margin-top: 1.1rem;"><span>NAVIGATION</span></div>', unsafe_allow_html=True)
     selected = option_menu(
         menu_title=None,
         options=["Dashboard", "Churn Radar", "CLV Projections", "Supply Chain"],
-        icons=["speedometer2", "shield-exclamation", "currency-dollar", "box-seam"],
+        icons=["speedometer2", "shield-check", "graph-up-arrow", "box-seam"],
         default_index=0,
         styles={
             "container": {
-                "padding": "0.5rem 0",
+                "padding": "0",
                 "background-color": "transparent",
             },
             "icon": {
@@ -115,55 +111,68 @@ with st.sidebar:
             "nav-link": {
                 "font-size": "0.92rem",
                 "text-align": "left",
-                "margin": "3px 0",
-                "padding": "0.7rem 1rem",
+                "margin": "4px 0",
+                "padding": "0.75rem 1rem",
                 "border-radius": "12px",
                 "color": "#94a3b8",
                 "background-color": "transparent",
                 "--hover-color": "rgba(99, 102, 241, 0.08)",
+                "transition": "all 0.2s ease",
             },
             "nav-link-selected": {
-                "background": "linear-gradient(135deg, rgba(99, 102, 241, 0.18), rgba(139, 92, 246, 0.12))",
+                "background": "linear-gradient(135deg, rgba(99, 102, 241, 0.22) 0%, rgba(139, 92, 246, 0.14) 100%)",
                 "color": "#ffffff",
                 "font-weight": "600",
+                "border": "1px solid rgba(99, 102, 241, 0.35)",
             },
         },
     )
 
-    # ── Uploaded Data Indicator ──
+    # ── Store Data Status Card ──
     if st.session_state.uploaded_data is not None:
         df = st.session_state.uploaded_data
-        fname = st.session_state.uploaded_filename or "data"
+        fname = st.session_state.uploaded_filename or "custom_data.csv"
         st.markdown(f"""
-        <div style="margin-top: 0.8rem; padding: 0.7rem 1rem; border-radius: 12px;
-                    background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.2);">
-            <div style="display: flex; align-items: center; gap: 0.4rem; margin-bottom: 0.3rem;">
-                <span style="width: 8px; height: 8px; border-radius: 50%; background: #10b981;
-                             display: inline-block; box-shadow: 0 0 6px #10b981;"></span>
-                <span style="color: #10b981; font-size: 0.78rem; font-weight: 600;">Data Loaded</span>
+        <div class="sidebar-status-card loaded">
+            <div class="status-header">
+                <span class="status-dot green-pulse"></span>
+                <span class="status-title">Custom Data Active</span>
             </div>
-            <div style="color: var(--text-secondary, #94a3b8); font-size: 0.72rem;">
-                📄 {fname}<br>
-                {len(df):,} rows · {len(df.columns)} cols
+            <div class="status-detail">
+                <span class="status-file">📄 {fname}</span>
+                <span class="status-meta">{len(df):,} rows · {len(df.columns)} columns</span>
             </div>
         </div>
         """, unsafe_allow_html=True)
 
-        if st.button("✕ Clear Data", key="clear_data_btn", use_container_width=True):
+        if st.button("✕ Reset to Demo Data", key="clear_data_btn", use_container_width=True):
             st.session_state.uploaded_data = None
             st.session_state.uploaded_filename = None
             st.rerun()
+    else:
+        st.markdown("""
+        <div class="sidebar-status-card demo">
+            <div class="status-header">
+                <span class="status-dot blue-pulse"></span>
+                <span class="status-title">Demo Store Active</span>
+            </div>
+            <div class="status-detail">
+                <span class="status-meta">Retail simulation dataset loaded</span>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
 
-    # Sidebar footer
-    st.markdown("---")
+    # ── Sidebar Footer (Clean, elegant, no unwanted credits) ──
     st.markdown("""
-    <div style="text-align: center; padding: 0.5rem 0;">
-        <p style="font-size: 0.7rem; color: var(--text-dim); margin: 0;">
-            Powered by ML · Built with Streamlit
-        </p>
-        <p style="font-size: 0.65rem; color: var(--text-muted); margin: 0.3rem 0 0 0;">
-            v2.0.0 · NexusPredict
-        </p>
+    <div class="sidebar-footer-card">
+        <div class="footer-status-line">
+            <span class="footer-dot-green"></span>
+            <span class="footer-status-text">AI Engine Online</span>
+        </div>
+        <div class="footer-meta-line">
+            <span class="footer-brand">NexusPredict Pro</span>
+            <span class="footer-badge">v2.4</span>
+        </div>
     </div>
     """, unsafe_allow_html=True)
 
